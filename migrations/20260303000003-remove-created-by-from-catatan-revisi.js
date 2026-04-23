@@ -3,7 +3,16 @@
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.removeColumn('catatan_revisi', 'created_by');
+    // Kolom created_by mungkin sudah tidak ada (sudah dihapus atau tidak pernah ada)
+    // Skip jika tidak ada
+    try {
+      const desc = await queryInterface.describeTable('catatan_revisi');
+      if (desc.created_by) {
+        await queryInterface.removeColumn('catatan_revisi', 'created_by');
+      }
+    } catch (e) {
+      // Tabel atau kolom tidak ditemukan, skip
+    }
   },
 
   async down(queryInterface, Sequelize) {

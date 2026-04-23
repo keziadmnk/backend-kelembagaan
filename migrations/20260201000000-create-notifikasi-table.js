@@ -48,9 +48,9 @@ module.exports = {
                 comment: 'Tipe notifikasi'
             },
             is_read: {
-                type: Sequelize.TINYINT(1),
+                type: Sequelize.BOOLEAN,
                 allowNull: false,
-                defaultValue: 0,
+                defaultValue: false,
                 comment: 'Status sudah dibaca atau belum'
             },
             created_at: {
