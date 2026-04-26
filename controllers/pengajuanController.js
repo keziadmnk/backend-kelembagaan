@@ -602,7 +602,7 @@ const getCatatanRevisi = async (req, res) => {
 
         const catatanList = await CatatanRevisi.findAll({
             where: { id_pengajuan: id_pengajuan },
-            order: [["created_at", "DESC"]]  
+            order: [["created_at", "DESC"]]
         });
 
         res.status(200).json({
@@ -631,11 +631,11 @@ const selesaikanPengajuan = async (req, res) => {
             });
         }
 
-        const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-        if (!allowedTypes.includes(file.mimetype)) {
-            return res.status(400).json({
+        // req.minioKey diset oleh middleware handleRekomendasiUpload di route
+        if (!req.minioKey) {
+            return res.status(500).json({
                 success: false,
-                message: "File harus berformat PDF atau Word (.doc, .docx)"
+                message: "Gagal memproses file upload ke MinIO"
             });
         }
 
@@ -653,7 +653,7 @@ const selesaikanPengajuan = async (req, res) => {
             });
         }
 
-        const filePath = '/' + file.path.replace(/\\/g, '/');
+        const filePath = `/minio/${req.minioKey}`;
 
         await pengajuan.update({
             status_verifikasi: 'Selesai',

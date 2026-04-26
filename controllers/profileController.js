@@ -1,12 +1,22 @@
 const User = require('../models/User');
 const bcrypt = require('bcrypt');
+const { buildObjectName, uploadBufferToMinio } = require('../utils/minioUpload');
+
+const uploadProfileToMinio = async (file, userId) => {
+    const objectName = buildObjectName({
+        folder: 'profiles',
+        fileName: file.originalname,
+        suffix: `user_${userId}`
+    });
+
+    return uploadBufferToMinio({ file, objectName });
+};
 
 exports.updateProfile = async (req, res) => {
     try {
-        const userId = req.user.id; 
+        const userId = req.user.id;
         const { username, alamat, no_hp } = req.body;
 
-        // Find user
         const user = await User.findByPk(userId);
         if (!user) {
             return res.status(404).json({
@@ -43,7 +53,8 @@ exports.updateProfile = async (req, res) => {
         }
 
         if (req.file) {
-            updateData.foto_profile = req.file.filename;
+            const objectName = await uploadProfileToMinio(req.file, userId);
+            updateData.foto_profile = `/minio/${objectName}`;
         }
 
         await user.update(updateData);

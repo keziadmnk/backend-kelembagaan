@@ -9,7 +9,45 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.use("/uploads", express.static("uploads"));
+const path = require("path");
+const minioClient = require("./config/minio");
+const MINIO_BUCKET = process.env.MINIO_BUCKET || "layanan-kelembagaan-files";
+
+const getContentType = (filename) => {
+  const ext = path.extname(filename).toLowerCase();
+  const map = {
+    ".pdf":  "application/pdf",
+    ".doc":  "application/msword",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".xls":  "application/vnd.ms-excel",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".png":  "image/png",
+    ".jpg":  "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif":  "image/gif",
+    ".zip":  "application/zip",
+  };
+  return map[ext] || "application/octet-stream";
+};
+
+app.get("/minio/*path", async (req, res) => {
+  const segments = req.params.path;
+  const objectName = Array.isArray(segments) ? segments.join('/') : segments;
+  console.log(`[MinIO View] bucket=${MINIO_BUCKET} object=${objectName}`);
+  if (!objectName) return res.status(400).json({ success: false, message: "Path file tidak valid" });
+  try {
+    const stream = await minioClient.getObject(MINIO_BUCKET, objectName);
+    res.setHeader("Content-Type", getContentType(objectName));
+    stream.on("error", (err) => {
+      console.error("[MinIO View] stream error:", err.message);
+      if (!res.headersSent) res.status(404).json({ success: false, message: "File tidak ditemukan" });
+    });
+    stream.pipe(res);
+  } catch (err) {
+    console.error("[MinIO View] getObject error:", err.message);
+    res.status(404).json({ success: false, message: "File tidak ditemukan" });
+  }
+});
 
 const authRoutes = require("./routes/auth");
 const userRoutes = require("./routes/users");
@@ -37,8 +75,6 @@ sequelize
   .authenticate()
   .then(() => {
     console.log("Connection has been established successfully.");
-    const isDevelopment = process.env.NODE_ENV !== 'production';
-
     return sequelize.sync({ force: false });
   })
   .then(() => {

@@ -1,13 +1,17 @@
-const path = require('path');
-const fs = require('fs');
 const { LogProses, BuktiDukungProses, Proses, Pengajuan } = require('../models/relation');
 const { createNotifikasi } = require('./notifikasiController');
 const sequelize = require('../config/database');
+const { buildObjectName, decodeOriginalName, uploadBufferToMinio } = require('../utils/minioUpload');
 
-const buktiDir = path.join(__dirname, '../uploads/bukti-proses');
-if (!fs.existsSync(buktiDir)) {
-    fs.mkdirSync(buktiDir, { recursive: true });
-}
+// Upload satu file buffer ke MinIO, return object key
+const uploadBuktiToMinio = async (file) => {
+    const objectName = buildObjectName({
+        folder: 'bukti-proses',
+        fileName: file.originalname,
+        suffix: Math.round(Math.random() * 1e6)
+    });
+    return uploadBufferToMinio({ file, objectName });
+};
 
 const getAllProses = async (req, res) => {
     try {
@@ -59,6 +63,7 @@ const addLogProses = async (req, res) => {
             await t.rollback();
             return res.status(400).json({ success: false, message: 'Pengajuan belum disetujui' });
         }
+
         const proses = await Proses.findByPk(id_proses, { transaction: t });
         if (!proses) {
             await t.rollback();
@@ -72,19 +77,22 @@ const addLogProses = async (req, res) => {
             created_at: new Date()
         }, { transaction: t });
 
+        // Upload semua file bukti ke MinIO
         if (files && files.length > 0) {
             for (const file of files) {
-                const relPath = '/uploads/bukti-proses/' + path.basename(file.path);
+                const objectName = await uploadBuktiToMinio(file);
+                const originalName = decodeOriginalName(file.originalname);
                 await BuktiDukungProses.create({
                     id_log: log.id_log,
-                    nama_file: Buffer.from(file.originalname, 'latin1').toString('utf8'),
-                    file_path: relPath,
+                    nama_file: originalName,
+                    file_path: `/minio/${objectName}`,
                     uploaded_at: new Date()
                 }, { transaction: t });
             }
         }
 
         await t.commit();
+
         try {
             await createNotifikasi(
                 pengajuan.id_user,

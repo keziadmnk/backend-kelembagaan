@@ -1,8 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const upload = require("../config/upload");
+const { buildObjectName, decodeOriginalName, uploadBufferToMinio } = require("../utils/minioUpload");
 
-router.post("/single", upload.single("file"), (req, res) => {
+router.post("/single", upload.single("file"), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({
@@ -11,14 +12,21 @@ router.post("/single", upload.single("file"), (req, res) => {
             });
         }
 
-        const fileUrl = `/uploads/documents/${req.file.filename}`;
+        const objectName = await uploadBufferToMinio({
+            file: req.file,
+            objectName: buildObjectName({
+                folder: "documents",
+                fileName: req.file.originalname,
+            }),
+        });
+        const fileUrl = `/minio/${objectName}`;
 
         res.status(200).json({
             success: true,
             message: "File berhasil diupload",
             data: {
-                id_persyaratan: req.body.id_persyaratan, 
-                nama_file: req.file.originalname,
+                id_persyaratan: req.body.id_persyaratan,
+                nama_file: decodeOriginalName(req.file.originalname),
                 path_file: fileUrl,
                 size: req.file.size,
                 mimetype: req.file.mimetype,
@@ -34,7 +42,7 @@ router.post("/single", upload.single("file"), (req, res) => {
     }
 });
 
-router.post("/multiple", upload.array("files", 10), (req, res) => {
+router.post("/multiple", upload.array("files", 10), async (req, res) => {
     try {
         if (!req.files || req.files.length === 0) {
             return res.status(400).json({
@@ -43,12 +51,23 @@ router.post("/multiple", upload.array("files", 10), (req, res) => {
             });
         }
 
-        const uploadedFiles = req.files.map((file) => ({
-            nama_file: file.originalname,
-            path_file: `/uploads/documents/${file.filename}`,
-            size: file.size,
-            mimetype: file.mimetype,
-        }));
+        const uploadedFiles = await Promise.all(
+            req.files.map(async (file) => {
+                const objectName = await uploadBufferToMinio({
+                    file,
+                    objectName: buildObjectName({
+                        folder: "documents",
+                        fileName: file.originalname,
+                    }),
+                });
+                return {
+                    nama_file: decodeOriginalName(file.originalname),
+                    path_file: `/minio/${objectName}`,
+                    size: file.size,
+                    mimetype: file.mimetype,
+                };
+            })
+        );
 
         res.status(200).json({
             success: true,

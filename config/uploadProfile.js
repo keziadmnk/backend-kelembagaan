@@ -1,25 +1,4 @@
 const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
-
-const uploadDir = path.join(__dirname, "../uploads/profiles");
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-    console.log("📁 Created uploads/profiles directory");
-}
-
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, uploadDir);
-    },
-    filename: function (req, file, cb) {
-        const timestamp = Date.now();
-        const userId = req.user.id;
-        const ext = path.extname(file.originalname);
-        const uniqueName = `user_${userId}_${timestamp}${ext}`;
-        cb(null, uniqueName);
-    },
-});
 
 const fileFilter = (req, file, cb) => {
     const allowedMimes = [
@@ -43,7 +22,7 @@ const fileFilter = (req, file, cb) => {
 };
 
 const uploadProfile = multer({
-    storage: storage,
+    storage: multer.memoryStorage(),
     fileFilter: fileFilter,
     limits: {
         fileSize: 2 * 1024 * 1024, // Max 2MB
