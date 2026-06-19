@@ -1,9 +1,10 @@
-const express = require("express");
+﻿const express = require("express");
 const router = express.Router();
 const upload = require("../config/upload");
 const { buildObjectName, decodeOriginalName, uploadBufferToMinio } = require("../utils/minioUpload");
+const { authenticate } = require("../middleware/auth");
 
-router.post("/single", upload.single("file"), async (req, res) => {
+router.post("/single", authenticate, upload.single("file"), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({
@@ -42,7 +43,7 @@ router.post("/single", upload.single("file"), async (req, res) => {
     }
 });
 
-router.post("/multiple", upload.array("files", 10), async (req, res) => {
+router.post("/multiple", authenticate, upload.array("files", 10), async (req, res) => {
     try {
         if (!req.files || req.files.length === 0) {
             return res.status(400).json({
@@ -85,3 +86,4 @@ router.post("/multiple", upload.array("files", 10), async (req, res) => {
 });
 
 module.exports = router;
+

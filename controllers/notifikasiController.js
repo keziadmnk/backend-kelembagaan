@@ -1,6 +1,8 @@
-const Notifikasi = require("../models/Notifikasi");
-const { Pengajuan, User, ModulLayanan } = require("../models/relation");
+﻿const Notifikasi = require("../models/Notifikasi");
 
+const canAccessNotification = (req, notification) => {
+    return req.user?.role === "admin" || Number(notification.id_user) === Number(req.user?.id);
+};
 
 const getNotifikasiByUser = async (req, res) => {
     try {
@@ -24,7 +26,6 @@ const getNotifikasiByUser = async (req, res) => {
         });
     }
 };
-
 
 const getUnreadCount = async (req, res) => {
     try {
@@ -51,15 +52,20 @@ const getUnreadCount = async (req, res) => {
     }
 };
 
-
 const markAsRead = async (req, res) => {
     try {
         const { id } = req.params;
+        const notifikasi = await Notifikasi.findByPk(id);
 
-        await Notifikasi.update(
-            { is_read: true },
-            { where: { id_notifikasi: id } }
-        );
+        if (!notifikasi) {
+            return res.status(404).json({ success: false, message: "Notifikasi tidak ditemukan" });
+        }
+
+        if (!canAccessNotification(req, notifikasi)) {
+            return res.status(403).json({ success: false, message: "Akses ditolak untuk notifikasi ini" });
+        }
+
+        await notifikasi.update({ is_read: true });
 
         res.json({
             success: true,
@@ -74,7 +80,6 @@ const markAsRead = async (req, res) => {
         });
     }
 };
-
 
 const markAllAsRead = async (req, res) => {
     try {
@@ -99,7 +104,6 @@ const markAllAsRead = async (req, res) => {
     }
 };
 
-
 const createNotifikasi = async (userId, pengajuanId, judul, pesan, tipe) => {
     try {
         const notifikasi = await Notifikasi.create({
@@ -118,14 +122,20 @@ const createNotifikasi = async (userId, pengajuanId, judul, pesan, tipe) => {
     }
 };
 
-
 const deleteNotifikasi = async (req, res) => {
     try {
         const { id } = req.params;
+        const notifikasi = await Notifikasi.findByPk(id);
 
-        await Notifikasi.destroy({
-            where: { id_notifikasi: id },
-        });
+        if (!notifikasi) {
+            return res.status(404).json({ success: false, message: "Notifikasi tidak ditemukan" });
+        }
+
+        if (!canAccessNotification(req, notifikasi)) {
+            return res.status(403).json({ success: false, message: "Akses ditolak untuk notifikasi ini" });
+        }
+
+        await notifikasi.destroy();
 
         res.json({
             success: true,

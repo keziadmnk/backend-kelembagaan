@@ -1,9 +1,11 @@
-const express = require('express');
+﻿const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const minioClient = require('../config/minio');
 const path = require('path');
 const { getAllProses, getLogByPengajuan, addLogProses } = require('../controllers/logProsesController');
+const { authenticate, isAdmin } = require('../middleware/auth');
+const { Pengajuan } = require('../models/relation');
 
 const BUCKET = process.env.MINIO_BUCKET || 'layanan-kelembagaan-files';
 
@@ -12,11 +14,23 @@ const uploadBukti = multer({
     limits: { fileSize: 20 * 1024 * 1024 }, // Max 20MB
 });
 
-router.get('/proses', getAllProses);
-router.get('/log/:id_pengajuan', getLogByPengajuan);
-router.post('/log/:id_pengajuan', uploadBukti.array('bukti'), addLogProses);
+const ensurePengajuanAccess = async (req, res, next) => {
+    try {
+        const pengajuan = await Pengajuan.findByPk(req.params.id_pengajuan);
+        if (!pengajuan) return res.status(404).json({ success: false, message: 'Pengajuan tidak ditemukan' });
+        if (req.user.role === 'admin' || Number(pengajuan.id_user) === Number(req.user.id)) return next();
+        return res.status(403).json({ success: false, message: 'Akses ditolak untuk pengajuan ini' });
+    } catch (error) {
+        console.error('Error checking proses access:', error);
+        return res.status(500).json({ success: false, message: 'Gagal memeriksa akses pengajuan' });
+    }
+};
 
-router.get('/download', async (req, res) => {
+router.get('/proses', authenticate, getAllProses);
+router.get('/log/:id_pengajuan', authenticate, ensurePengajuanAccess, getLogByPengajuan);
+router.post('/log/:id_pengajuan', authenticate, isAdmin, uploadBukti.array('bukti'), addLogProses);
+
+router.get('/download', authenticate, async (req, res) => {
     const objectName = req.query.path;
     if (!objectName) {
         return res.status(400).json({ success: false, message: 'Parameter path wajib diisi' });

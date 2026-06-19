@@ -1,12 +1,14 @@
-const express = require("express");
+﻿const express = require("express");
 const router = express.Router();
 const pengajuanController = require("../controllers/pengajuanController");
 const multer = require("multer");
 const { buildObjectName, uploadBufferToMinio } = require("../utils/minioUpload");
+const { authenticate, isAdmin, isPemohon } = require("../middleware/auth");
+const { Pengajuan } = require("../models/relation");
 
 const uploadRekomendasi = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 10 * 1024 * 1024 }, // Max 10MB
+    limits: { fileSize: 10 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         const allowed = [
             "application/pdf",
@@ -31,7 +33,6 @@ const uploadRekomendasiToMinio = async (file) => {
     return uploadBufferToMinio({ file, objectName });
 };
 
-// Middleware: upload ke MinIO lalu taruh key di req.minioKey
 const handleRekomendasiUpload = async (req, res, next) => {
     try {
         if (!req.file) return next();
@@ -44,27 +45,45 @@ const handleRekomendasiUpload = async (req, res, next) => {
     }
 };
 
+const ensureOwnUserOrAdmin = (paramName = "id_user") => (req, res, next) => {
+    if (req.user.role === "admin" || Number(req.params[paramName]) === Number(req.user.id)) return next();
+    return res.status(403).json({ success: false, message: "Akses ditolak untuk data pengguna lain" });
+};
+
+const ensurePengajuanAccess = (paramName = "id") => async (req, res, next) => {
+    try {
+        const pengajuan = await Pengajuan.findByPk(req.params[paramName]);
+        if (!pengajuan) return res.status(404).json({ success: false, message: "Pengajuan tidak ditemukan" });
+        if (req.user.role === "admin" || Number(pengajuan.id_user) === Number(req.user.id)) {
+            req.pengajuan = pengajuan;
+            return next();
+        }
+        return res.status(403).json({ success: false, message: "Akses ditolak untuk pengajuan ini" });
+    } catch (error) {
+        console.error("Error checking pengajuan access:", error);
+        return res.status(500).json({ success: false, message: "Gagal memeriksa akses pengajuan" });
+    }
+};
+
 router.get("/modul-layanan", pengajuanController.getAllModulLayanan);
 router.get("/persyaratan/:id_modul", pengajuanController.getPersyaratanByModul);
 
-router.get("/user/:id_user", pengajuanController.getPengajuanByUser);
+router.get("/user/:id_user", authenticate, ensureOwnUserOrAdmin("id_user"), pengajuanController.getPengajuanByUser);
+router.post("/create", authenticate, isPemohon, pengajuanController.createPengajuan);
 
-router.post("/create", pengajuanController.createPengajuan);
+router.get("/all", authenticate, isAdmin, pengajuanController.getAllPengajuan);
+router.get("/status/:status", authenticate, isAdmin, pengajuanController.getPengajuanByStatus);
+router.put("/update/:id_pengajuan", authenticate, isAdmin, pengajuanController.updatePengajuanStatus);
 
-router.get("/all", pengajuanController.getAllPengajuan);
-router.get("/status/:status", pengajuanController.getPengajuanByStatus);
-router.put("/update/:id_pengajuan", pengajuanController.updatePengajuanStatus);
-
-router.get("/dokumen/:id_pengajuan", pengajuanController.getDokumenByPengajuan);
-
-router.get("/catatan-revisi/:id_pengajuan", pengajuanController.getCatatanRevisi);
-
-router.get("/:id", pengajuanController.getPengajuanById);
-
-router.put("/revisi/:id", pengajuanController.submitRevisi);
+router.get("/dokumen/:id_pengajuan", authenticate, ensurePengajuanAccess("id_pengajuan"), pengajuanController.getDokumenByPengajuan);
+router.get("/catatan-revisi/:id_pengajuan", authenticate, ensurePengajuanAccess("id_pengajuan"), pengajuanController.getCatatanRevisi);
+router.get("/:id", authenticate, ensurePengajuanAccess("id"), pengajuanController.getPengajuanById);
+router.put("/revisi/:id", authenticate, isPemohon, ensurePengajuanAccess("id"), pengajuanController.submitRevisi);
 
 router.post(
     "/selesaikan/:id",
+    authenticate,
+    isAdmin,
     uploadRekomendasi.single("file_rekomendasi"),
     handleRekomendasiUpload,
     pengajuanController.selesaikanPengajuan

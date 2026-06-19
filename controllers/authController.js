@@ -1,7 +1,12 @@
-const jwt = require('jsonwebtoken');
+﻿const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 require('dotenv').config();
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
+const DEFAULT_JWT_SECRET = 'your-secret-key-change-this-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || DEFAULT_JWT_SECRET;
+
+if (process.env.NODE_ENV === 'production' && JWT_SECRET === DEFAULT_JWT_SECRET) {
+    throw new Error('JWT_SECRET wajib diisi dengan nilai kuat sebelum menjalankan production');
+}
 
 exports.login = async (req, res) => {
     try {
@@ -104,3 +109,4 @@ exports.logout = async (req, res) => {
         });
     }
 };
+

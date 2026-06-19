@@ -1,19 +1,27 @@
-const jwt = require('jsonwebtoken');
+﻿const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
+const DEFAULT_JWT_SECRET = 'your-secret-key-change-this-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || DEFAULT_JWT_SECRET;
+
+if (process.env.NODE_ENV === 'production' && JWT_SECRET === DEFAULT_JWT_SECRET) {
+    throw new Error('JWT_SECRET wajib diisi dengan nilai kuat sebelum menjalankan production');
+}
 
 exports.authenticate = async (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;
+        const bearerToken = authHeader && authHeader.startsWith('Bearer ')
+            ? authHeader.substring(7)
+            : null;
+        const token = bearerToken || req.query.token;
 
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        if (!token) {
             return res.status(401).json({
                 success: false,
                 message: 'Token tidak ditemukan. Silakan login terlebih dahulu'
             });
         }
-        const token = authHeader.substring(7);
 
         const decoded = jwt.verify(token, JWT_SECRET);
 

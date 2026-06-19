@@ -1,4 +1,4 @@
-const {
+﻿const {
     Pengajuan,
     ModulLayanan,
     PersyaratanDokumen,
@@ -146,13 +146,14 @@ const createPengajuan = async (req, res) => {
 
     try {
         const {
-            id_user,
             id_modul,
             nama_kabupaten,
             catatan_pemohon,
             dokumen_upload,
         } = req.body;
 
+
+        const id_user = req.user?.id;
         console.log("Creating pengajuan with data:", {
             id_user,
             id_modul,
@@ -498,6 +499,7 @@ const updatePengajuanStatus = async (req, res) => {
             catatan_revisi
         } = req.body;
 
+
         const { Pengajuan, CatatanRevisi, LogProses, Proses } = require('../models/relation');
         const pengajuan = await Pengajuan.findByPk(id_pengajuan, { transaction: t });
 
@@ -723,7 +725,7 @@ const submitRevisi = async (req, res) => {
         const { id } = req.params;
         const { catatan_pemohon, dokumen_upload } = req.body;
 
-        console.log("📝 Submitting revisi for pengajuan:", id);
+        console.log("ðŸ“ Submitting revisi for pengajuan:", id);
 
         const pengajuan = await Pengajuan.findByPk(id);
         if (!pengajuan) {
@@ -812,3 +814,6 @@ module.exports = {
     getPengajuanById,
     submitRevisi
 };
+
+
+

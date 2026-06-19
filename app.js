@@ -6,11 +6,25 @@ require('./models/relation');
 
 const app = express();
 
-app.use(cors());
+const allowedOrigins = (process.env.FRONTEND_URL || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Origin tidak diizinkan oleh CORS'));
+  },
+  credentials: true,
+}));
 app.use(express.json());
 
 const path = require("path");
 const minioClient = require("./config/minio");
+const { authenticate } = require("./middleware/auth");
 const MINIO_BUCKET = process.env.MINIO_BUCKET || "layanan-kelembagaan-files";
 
 const getContentType = (filename) => {
@@ -30,24 +44,29 @@ const getContentType = (filename) => {
   return map[ext] || "application/octet-stream";
 };
 
-app.get("/minio/*path", async (req, res) => {
+const streamDocumentFromMinio = async (req, res) => {
   const segments = req.params.path;
   const objectName = Array.isArray(segments) ? segments.join('/') : segments;
-  console.log(`[MinIO View] bucket=${MINIO_BUCKET} object=${objectName}`);
+  if (process.env.NODE_ENV !== "production") {
+    console.log(`[Document Proxy] bucket=${MINIO_BUCKET} object=${objectName}`);
+  }
   if (!objectName) return res.status(400).json({ success: false, message: "Path file tidak valid" });
   try {
     const stream = await minioClient.getObject(MINIO_BUCKET, objectName);
     res.setHeader("Content-Type", getContentType(objectName));
     stream.on("error", (err) => {
-      console.error("[MinIO View] stream error:", err.message);
+      console.error("[Document Proxy] stream error:", err.message);
       if (!res.headersSent) res.status(404).json({ success: false, message: "File tidak ditemukan" });
     });
     stream.pipe(res);
   } catch (err) {
-    console.error("[MinIO View] getObject error:", err.message);
+    console.error("[Document Proxy] getObject error:", err.message);
     res.status(404).json({ success: false, message: "File tidak ditemukan" });
   }
-});
+};
+
+app.get("/dokumen/*path", authenticate, streamDocumentFromMinio);
+app.get("/minio/*path", authenticate, streamDocumentFromMinio);
 
 const authRoutes = require("./routes/auth");
 const userRoutes = require("./routes/users");
@@ -75,10 +94,16 @@ sequelize
   .authenticate()
   .then(() => {
     console.log("Connection has been established successfully.");
+    if (process.env.NODE_ENV === 'production') {
+      console.log('Production mode: gunakan migration, sequelize.sync otomatis dilewati.');
+      return null;
+    }
     return sequelize.sync({ force: false });
   })
   .then(() => {
-    console.log("Database & tables have been synced.");
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Database & tables have been synced.');
+    }
     console.log("ℹUntuk update schema, jalankan: npx sequelize-cli db:migrate");
   })
   .catch((err) => {

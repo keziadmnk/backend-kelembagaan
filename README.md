@@ -71,8 +71,7 @@ MINIO_BUCKET=layanan-kelembagaan-files
 
 ---
 
-## 4. Setup MinIO (WAJIB — Baru di Versi Ini)
-
+## 4. Setup MinIO 
 Sistem ini menggunakan **MinIO** sebagai penyimpanan file (dokumen, bukti proses, surat rekomendasi). **Tanpa MinIO, fitur upload/download file tidak akan berfungsi.**
 
 ### Cara A — Menggunakan Docker (Paling Mudah)
@@ -110,7 +109,7 @@ Setelah MinIO berjalan, buat bucket bernama `layanan-kelembagaan-files`:
 4. Nama bucket: **`layanan-kelembagaan-files`**
 5. Klik **Create Bucket**
 
-> ⚠️ Nama bucket **harus persis sama** dengan nilai `MINIO_BUCKET` di file `.env`.
+>  Nama bucket **harus persis sama** dengan nilai `MINIO_BUCKET` di file `.env`.
 
 ---
 
@@ -160,9 +159,3 @@ Server akan berjalan di: **http://localhost:3001**
 | `profiles/` | Foto profil pengguna |
 
 ---
-
-## Catatan Penting
-
-- Folder `uploads/` yang lama sudah **tidak digunakan**. Semua file sekarang disimpan langsung ke MinIO (tidak ke disk lokal).
-- File `.env` **tidak boleh** di-commit ke GitHub — sudah dikecualikan di `.gitignore`.
-- MinIO harus **sudah berjalan** sebelum server backend dijalankan.
