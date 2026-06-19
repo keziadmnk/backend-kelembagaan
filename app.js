@@ -6,20 +6,38 @@ require('./models/relation');
 
 const app = express();
 
-const allowedOrigins = (process.env.FRONTEND_URL || '')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://127.0.0.1:5173",
+]
+  .filter(Boolean)
+  .map((origin) => origin.trim().replace(/\/$/, ""));
 
-app.use(cors({
+const corsOptions = {
   origin(origin, callback) {
-    if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+    if (!origin) {
       return callback(null, true);
     }
-    return callback(new Error('Origin tidak diizinkan oleh CORS'));
+
+    const cleanOrigin = origin.trim().replace(/\/$/, "");
+
+    if (allowedOrigins.includes(cleanOrigin)) {
+      return callback(null, true);
+    }
+
+    console.log("CORS blocked origin:", cleanOrigin);
+    console.log("Allowed origins:", allowedOrigins);
+
+    return callback(new Error("Origin tidak diizinkan oleh CORS"));
   },
   credentials: true,
-}));
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
 const path = require("path");
